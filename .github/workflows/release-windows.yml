@@ -1,19 +1,14 @@
-name: Release Windows App
+name: Publish App Download
 
 on:
   workflow_dispatch:
-    inputs:
-      version:
-        description: "Release version, for example v1.0.0"
-        required: true
-        type: string
 
 permissions:
   contents: write
 
 jobs:
-  release-windows:
-    name: Build and publish Windows release
+  publish-app-download:
+    name: Build and publish app download
     runs-on: windows-latest
 
     steps:
@@ -27,16 +22,6 @@ jobs:
         with:
           python-version: "3.11"
           cache: "pip"
-
-      - name: Validate release version
-        shell: pwsh
-        env:
-          RELEASE_VERSION: ${{ inputs.version }}
-        run: |
-          if ($env:RELEASE_VERSION -notmatch '^v\d+\.\d+\.\d+$') {
-            Write-Error "Version must match vMAJOR.MINOR.PATCH, for example v1.0.0"
-            exit 1
-          }
 
       - name: Install dependencies
         run: |
@@ -56,14 +41,28 @@ jobs:
             ForEach-Object { "$($_.Hash)  PDFConcatenator.exe" } |
             Set-Content dist/PDFConcatenator.exe.sha256.txt
 
-      - name: Create GitHub release
+      - name: Create release notes
+        shell: pwsh
+        run: |
+          @"
+          Download **PDFConcatenator.exe** below, then double-click it to run the app.
+
+          If Windows SmartScreen appears, choose **More info** and then **Run anyway**.
+          "@ | Set-Content release-notes.md
+
+      - name: Publish latest app download
         shell: pwsh
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          RELEASE_VERSION: ${{ inputs.version }}
         run: |
-          gh release create $env:RELEASE_VERSION `
-            dist/PDFConcatenator.exe `
-            dist/PDFConcatenator.exe.sha256.txt `
-            --title "PDF Concatenator $env:RELEASE_VERSION" `
-            --notes "Download PDFConcatenator.exe, then double-click it to run the app."
+          $tag = "pdf-concatenator-latest"
+          $title = "PDF Concatenator - Latest Download"
+
+          gh release view $tag *> $null
+          if ($LASTEXITCODE -eq 0) {
+            gh release upload $tag dist/PDFConcatenator.exe dist/PDFConcatenator.exe.sha256.txt --clobber
+            gh release edit $tag --title $title --notes-file release-notes.md --latest
+          }
+          else {
+            gh release create $tag dist/PDFConcatenator.exe dist/PDFConcatenator.exe.sha256.txt --title $title --notes-file release-notes.md --latest
+          }
