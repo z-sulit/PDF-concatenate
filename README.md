@@ -70,6 +70,3 @@ PDF_Concatenate/
 |---------|----------|----------------------|
 | pypdf   | >= 4.0.0 | PDF reading & writing |
 
-## License
-
-MIT
